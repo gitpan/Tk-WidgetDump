@@ -1,0 +1,16 @@
+Revision history for Perl extension WidgetDump.
+
+1.28
+	- show binding details
+
+1.27
+	- show Subwidgets
+
+1.24
+	- show bindings
+
+1.21
+	- support for ObjEditor
+
+1.20
+	- first public release
