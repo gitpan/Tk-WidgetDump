@@ -1,9 +1,11 @@
 --- #YAML:1.0
 name:                Tk-WidgetDump
-version:             1.35
+version:             1.37
 abstract:            ~
 license:             perl
-generated_by:        ExtUtils::MakeMaker version 6.32
+author:              
+    - Slaven Rezic (srezic@cpan.org)
+generated_by:        ExtUtils::MakeMaker version 6.42
 distribution_type:   module
 requires:     
     Tk:                            800
@@ -13,7 +15,5 @@ requires:
     Tk::ObjScanner:                0
     Tk::Pod:                       0
 meta-spec:
-    url:     http://module-build.sourceforge.net/META-spec-v1.2.html
-    version: 1.2
-author:
-    - Slaven Rezic (srezic@cpan.org)
+    url:     http://module-build.sourceforge.net/META-spec-v1.3.html
+    version: 1.3
