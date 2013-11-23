@@ -1,11 +1,9 @@
-#!/usr/local/bin/perl -w
 # -*- perl -*-
 
 #
-# $Id: WidgetDump.pm,v 1.37 2008/01/23 21:50:47 eserte Exp $
 # Author: Slaven Rezic
 #
-# Copyright (C) 1999-2008 Slaven Rezic. All rights reserved.
+# Copyright (C) 1999-2011,2013 Slaven Rezic. All rights reserved.
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
 #
@@ -17,7 +15,7 @@ package Tk::WidgetDump;
 use vars qw($VERSION);
 use strict;
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.37 $ =~ /(\d+)\.(\d+)/);
+$VERSION = '1.38_51';
 
 package # hide from CPAN indexer
   Tk::Widget;
@@ -85,6 +83,7 @@ sub WidgetDump {
 			    }, Ev('X'), Ev('Y') ]);
     }
 
+    $t;
 }
 
 sub WD_HList {
@@ -459,18 +458,21 @@ sub WidgetInfo {
 			 -command => sub {
 			     $wd->method_call($w);
 			 });
-    $txt->windowCreate("end",
-		       -window => $b,
-		       );
+    $txt->windowCreate("end", -window => $b);
 
     if ($w->isa('Tk::Canvas')) {
 	my $b = $txt->Button(-text => "Canvas dump",
 			     -command => sub {
 				 $wd->canvas_dump($w);
 			     });
-	$txt->windowCreate("end",
-			   -window => $b,
-			  );
+	$txt->windowCreate("end", -window => $b);
+    }
+    if ($w->can('tagNames')) {
+	my $b = $txt->Button(-text => 'Tags',
+			     -command => sub {
+				 $wd->tag_dump($w);
+			     });
+	$txt->windowCreate('end', -window => $b);
     }
 
     my $ObjScanner;
@@ -515,8 +517,8 @@ sub WidgetInfo {
 sub show_bindings {
     my($wd, $w) = @_;
     my $t = $wd->Toplevel(-title => 'Bindings');
-    my $ttxt = $t->Scrolled('ROText')->pack(-fill => 'both',
-					    -expand => 1);
+    my $ttxt = $t->Scrolled($wd->_more_widget_class)->pack(-fill => 'both',
+							   -expand => 1);
     _text_link_config($ttxt, sub { _bind_text_tag($_[0], $wd) } );
     foreach my $bindtag ($w->bindtags) {
 	$ttxt->insert("end", "Bind tag: $bindtag\n\n");
@@ -541,7 +543,7 @@ sub show_bindings {
 sub show_binding_details {
     my($wd, $widget, $bindtag, $bind) = @_;
     my $t = $wd->Toplevel(-title => "Binding details");
-    my $ttxt = $t->Scrolled("ROText")->pack(-fill => "both", -expand => 1);
+    my $ttxt = $t->Scrolled($wd->_more_widget_class)->pack(-fill => "both", -expand => 1);
     my $cb = $widget->Tk::bind($bindtag, $bind);
     $ttxt->insert("end", "Binding <$bind> for bindtag <$bindtag>:\n");
     require Data::Dumper;
@@ -627,7 +629,7 @@ sub method_call {
     my $t = $wd->Toplevel(-title => "Method call");
     my $f = $t->Frame->pack(-fill => "x");
     my $eval;
-    $f->Label(-text => "Method call on $w")->pack(-side => "left");
+    $f->Label(-text => "Method call on $w ->")->pack(-side => "left");
     my $e = $f->_hist_entry({-textvariable => \$eval},
 			    {-match => 1, -dup => 0})->pack(-side => "left");
     $e->focus;
@@ -647,10 +649,15 @@ sub method_call {
 	$text->delete("1.0", "end");
 	$text->insert("end", $res);
     };
-    $e->bind("<Return>" => $doit);
+    my $close = sub {
+	$t->destroy;
+    };
+    $e->bind('<Return>' => $doit);
+    $e->bind('<Escape>' => $close);
     $f->Button(-text => "Execute!", -command => $doit)->pack(-side => "left");
-    $f->Button(-text => "Close", -command => [$t, "destroy"])->pack(-side => "left");
-    $text = $t->Scrolled("ROText", -scrollbars => "osoe",
+    $f->Button(-text => "Close", -command => $close)->pack(-side => "left");
+    $text = $t->Scrolled($wd->_more_widget_class,
+			 -scrollbars => "osoe",
 			 -font => "courier 10", # XXX do not hardcode
 			 -width => 40, -height => 5)->pack(-fill => "both", -expand => 1);
 }
@@ -688,11 +695,13 @@ sub _text_link_config {
     $txt->tagConfigure("title", -font => "Helvetica 10 bold"); # XXX do not hardcode!
 }
 
+######################################################################
+# Canvas
 sub canvas_config {
     my($wd, $c, $item) = @_;
     my $t = $wd->Toplevel(-title => "Canvas config of item $item");
 
-    my $txt = $t->Scrolled("ROText",
+    my $txt = $t->Scrolled($wd->_more_widget_class,
 			   -tabs => [map { (5*$_) . "c" } (1 .. 8)],
 			   -scrollbars => "osow",
 			   -wrap => "none",
@@ -720,8 +729,8 @@ sub canvas_config {
 sub canvas_dump {
     my($wd, $c) = @_;
     my $t = $wd->Toplevel(-title => "Canvas dump of $c");
-    require Tk::ROText;
-    my $txt = $t->Scrolled("ROText", -scrollbars => "osow",
+    my $txt = $t->Scrolled($wd->_more_widget_class,
+			   -scrollbars => "osow",
 			   -tabs => [map { (3*$_) . "c" } (1 .. 3)],
 			  )->pack(-fill => "both", -expand => 1);
     _text_link_config($txt, sub { _bind_text_tag($_[0], $wd) } );
@@ -785,7 +794,6 @@ sub edit_canvas_coords {
 	warn $@;
 	return;
     }
-    my $oldval = $val;
 
     my $t = $wd->Toplevel(-title => "Edit canvas coords");
     my $set_sub = sub {
@@ -804,6 +812,75 @@ sub edit_canvas_coords {
     $t->Button(-text => "Close", -command => [$t, "destroy"]);
 }
 
+######################################################################
+# Tags
+sub tag_dump {
+    my($wd, $w) = @_;
+    my $t = $wd->Toplevel(-title => "Tag dump of $w");
+    my $txt = $t->Scrolled($wd->_more_widget_class,
+			   -width => 15,
+			   -height => 5,
+			   -scrollbars => 'osow',
+			  )->pack(-fill => "both", -expand => 1);
+    _text_link_config($txt, sub { _bind_text_tag($_[0], $wd) } );
+
+    $txt->insert('end', "Tags\n\n", 'title');
+    for my $tag_name ($w->tagNames) {
+	$txt->insert('end', $tag_name, ["widgetlink", "tag-$w-$tag_name"], "\n");
+    }
+}
+
+sub tag_options {
+    my($wd, $w, $tag) = @_;
+
+    my $t = $wd->Toplevel(-title => "Options for tag $tag");
+    my $txt = $t->Scrolled($wd->_more_widget_class,
+			   -scrollbars => 'osow',
+			   -tabs => [map { (3*$_) . "c" } (1 .. 3)],
+			  )->pack(-fill => "both", -expand => 1);
+    _text_link_config($txt, sub { _bind_text_tag($_[0], $wd) } );
+    $txt->insert('end', "Option Name\tDefault Value\tCurrent Value\n", 'title');
+    for my $option_def ($w->tagConfigure($tag)) {
+	my($key,undef,undef,$def_val,$curr_val) = @$option_def;
+	$txt->insert('end',
+		     join("\t", map { !defined $_ ? '<undef>' : $_ } ($key, $def_val, $curr_val)),
+		     ['widgetlink', "tag-config-$w-$tag-$key"],
+		     "\n");
+    }
+    $txt->insert('end', "\n");
+}
+
+sub edit_tag_option {
+    my($wd, $w, $tag, $key) = @_;
+
+    my $val;
+    eval {
+	$val = $w->tagCget($tag, $key);
+    };
+    if ($@) {
+	warn $@;
+	return;
+    }
+
+    my $t = $wd->Toplevel(-title => "Edit tag option $key");
+    my $set_sub = sub {
+	eval {
+	    $w->tagConfigure($tag, $key, $val);
+	};
+	warn $@ if $@;
+    };
+
+    $t->Label(-text => "Edit option $key for tag $tag:")->pack(-side => "left");
+    my $e;
+    $e = eval 'Tk::WidgetDump::Entry->entry($t, \$val, $set_sub)';
+    warn $@ if $@;
+    $e->focus if Tk::Exists($e);
+    $t->bind("<Escape>" => [$t, 'destroy']);
+    $t->Button(-text => "Close", -command => [$t, "destroy"]);
+}
+
+######################################################################
+# Misc
 sub _insert_wd {
     my($wd, $hl, $top, $par) = @_;
     my $i = 0;
@@ -940,6 +1017,28 @@ sub _bind_text_tag {
 	    return;
 	}
     }
+
+    $i = _lsearch('tag\-config\-.*', @tags);
+    if ($i >= 0) {
+	if ($tags[$i] =~ /^tag-config-([^-]+)-(.*)-(-.+)$/) {
+	    my($w_name, $tag_name, $key) = ($1, $2, $3);
+	    my $widget = $ref2widget{$w_name};
+	    $wd->edit_tag_option($widget, $tag_name, $key);
+	    return;
+	}
+    }
+
+    $i = _lsearch('tag\-.*', @tags);
+    if ($i >= 0) {
+	if ($tags[$i] =~ /^tag-(.*)-(.*)$/) {
+	    my $w_name = $1;
+	    my $tag_name = $2;
+	    my $widget = $ref2widget{$w_name};
+	    $wd->tag_options($widget, $tag_name);
+	    return;
+	}
+    }
+
     warn "Can't match $tags[$i]";
 }
 
@@ -960,10 +1059,9 @@ sub _get_widget_info_window {
 	$wi->geometry("930x450");
     }
 
-    require Tk::ROText;
     my $bf = $wi->Frame->pack(-fill => 'x', -side => "bottom");
 
-    my $txt = $wi->Scrolled("ROText",
+    my $txt = $wi->Scrolled($wd->_more_widget_class,
 			    -tabs => [map { (5*$_) . "c" } (1 .. 8)],
 			    -wrap => "none",
 			   )->pack(-expand => 1, -fill => "both");
@@ -997,6 +1095,19 @@ sub _lsearch {
     return -1;
 
 } # end lsearch
+
+{
+    my $more_widget_class;
+    sub _more_widget_class {
+	return $more_widget_class if $more_widget_class;
+	if (eval { require Tk::More; 1 }) {
+	    return $more_widget_class = 'More';
+	} else {
+	    require Tk::ROText;
+	    return $more_widget_class = 'ROText';
+	}
+    }
+}
 
 # XXX weitermachen
 # die Idee: die gesamten Konfigurationsdaten aller Widgets per configure
@@ -1365,20 +1476,7 @@ use base qw(Tk::WidgetDump::Pixels);
 package Tk::WidgetDump::Underline;
 use base qw(Tk::WidgetDump::NumEntry);
 
-
-return 1 if caller;
-
-######################################################################
-
-package main;
-
-# self-test
-my $top = MainWindow->new;
-$top->Canvas->pack->createLine(0,0,100,100);
-#$top->withdraw;
-$top->WidgetDump;
-$top->WidgetDump;
-Tk::MainLoop;
+1;
 
 __END__
 
@@ -1460,6 +1558,6 @@ Slaven Rezic (srezic@cpan.org)
 
 =head1 SEE ALSO
 
-Tk(3).
+L<Tk>.
 
 =cut

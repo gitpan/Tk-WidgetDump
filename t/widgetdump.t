@@ -2,7 +2,6 @@
 # -*- perl -*-
 
 #
-# $Id: widgetdump.t,v 1.9 2008/01/23 21:51:26 eserte Exp $
 # Author: Slaven Rezic
 #
 
@@ -18,32 +17,39 @@ BEGIN {
     }
 }
 
-my $real_tests = 1;
-plan tests => 1 + $real_tests;
-
 use Tk;
 use Tk::DragDrop;
 use Tk::DropSite;
 
 $ENV{BATCH} = 1 if !defined $ENV{BATCH};
 
-use_ok('Tk::WidgetDump');
-
 my $top = eval { tkinit };
-if (!$top) {
- SKIP: { skip("Cannot create MainWindow", $real_tests) }
+if (!Tk::Exists($top)) {
+    plan skip_all => 'Cannot create MainWindow';
     exit 0;
 }
 
+plan tests => 3;
+
+use_ok('Tk::WidgetDump');
+
+$top->geometry('+10+10');
 $top->gridRowconfigure($_, -weight => 1) for (0..4);
 $top->gridColumnconfigure($_, -weight => 1) for (0..1);
 
 my %w;
 
 my $row = 0;
-foreach my $w (qw(Label Entry Button Listbox Canvas)) {
+foreach my $w_def (['Label'],
+		   ['Entry'],
+		   ['Button'],
+		   ['Listbox', -height => 3],
+		   ['Canvas', -width => 200, -height => 50],
+		   ['Text', -width => 40, -height => 4]
+		  ) {
+    my($w,@opts) = @$w_def;
     $top->Label(-text => $w . ": ")->grid(-row => $row, -column => 0, -sticky => "nw");
-    $w{$w} = $top->$w()->grid(-row => $row, -column => 1, -sticky => "eswn");
+    $w{$w} = $top->$w(@opts)->grid(-row => $row, -column => 1, -sticky => "eswn");
     $row++;
 }
 
@@ -65,8 +71,10 @@ $w{Button}->DropSite
 $top->{EvilCode} = sub { print "test " };
 
 $top->update;
-eval { $top->WidgetDump; };
+my $wd = eval { $top->WidgetDump; };
 is($@, "", "WidgetDump call");
+isa_ok $wd, 'Tk::WidgetDump';
+$wd->geometry('+20+20');
 
 $top->after(1*1000, sub { $top->destroy }) if $ENV{BATCH};
 MainLoop;
