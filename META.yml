@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Tk-WidgetDump
-version:            1.38_51
+version:            1.39
 abstract:           ~
 author:
     - Slaven Rezic (srezic@cpan.org)
